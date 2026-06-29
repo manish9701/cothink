@@ -47,7 +47,7 @@ Respond in plain text (no markdown formatting like **bold** or bullet points, ju
     parts.push({ text: userText })
 
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.0-flash',
       contents: [{ role: 'user', parts }],
       config: {
         systemInstruction: systemPrompt,
