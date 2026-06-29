@@ -42,7 +42,7 @@ function Section({
   icon: any
   title: string
   onOpen: () => void
-  onCreate: () => void
+  onCreate?: () => void
   children: React.ReactNode
 }) {
   return (
@@ -52,60 +52,44 @@ function Section({
       flexDirection: 'column',
       background: '#fff',
       borderRadius: 16,
-      border: '1px solid #e2e8f0',
+      border: '1px solid var(--zinc-150)',
       overflow: 'hidden',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
       minWidth: 0,
     }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px',
-        borderBottom: '1px solid #f1f5f9',
+        padding: '14px 18px',
+        borderBottom: '1px solid var(--zinc-100)',
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
       }}>
-        <Icon size={20} color="#64748b" />
+        <Icon size={18} color="var(--zinc-400)" />
         <span style={{
-          fontSize: 16, fontWeight: 600,
-          color: '#0f172a', letterSpacing: '-0.02em',
+          fontSize: 14, fontWeight: 600,
+          color: 'var(--zinc-800)', letterSpacing: '-0.018em',
           flex: 1,
         }}>{title}</span>
-        <button
-          onClick={onCreate}
-          style={{
-            height: 30, padding: '0 12px',
-            borderRadius: 8,
-            border: '1px solid #e2e8f0',
-            background: '#fff',
-            fontSize: 13, fontWeight: 500, color: '#475569',
-            transition: 'all 0.12s',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-          onMouseEnter={e => { (e.currentTarget).style.background = '#e2e8f0' }}
-          onMouseLeave={e => { (e.currentTarget).style.background = '#f1f5f9' }}
-          title="Create"
-        >
-          <Plus size={14} />
-        </button>
+        {onCreate && (
+          <button
+            onClick={onCreate}
+            className="section-action-btn scale-on-press"
+            title="Create"
+          >
+            <Plus size={18} />
+          </button>
+        )}
         <button
           onClick={onOpen}
-          style={{
-            background: '#0f172a', border: 'none', borderRadius: 6,
-            color: '#fff', fontSize: 12, fontWeight: 500,
-            padding: '4px 8px', cursor: 'pointer', transition: 'background 0.15s',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-          onMouseEnter={e => { (e.currentTarget).style.background = '#1e293b' }}
-          onMouseLeave={e => { (e.currentTarget).style.background = '#0f172a' }}
+          className="section-action-btn scale-on-press"
           title="Open"
         >
-          <ArrowRight size={14} />
+          <ArrowRight size={18} />
         </button>
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className="no-scroll">
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }} className="no-scroll">
         {children}
       </div>
     </div>
@@ -116,10 +100,11 @@ function Empty({ label }: { label: string }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100%', minHeight: 80,
-      color: '#94a3b8', fontSize: 13,
-      border: '1px dashed #e2e8f0', borderRadius: 12,
-      background: '#f8fafc',
+      height: '100%', minHeight: 72,
+      color: 'var(--zinc-400)', fontSize: 13, fontWeight: 400,
+      border: '1px dashed var(--zinc-200)', borderRadius: 10,
+      background: 'var(--zinc-50)',
+      letterSpacing: '-0.005em',
     }}>
       {label}
     </div>
@@ -140,16 +125,9 @@ export default function DashboardView({
   const [inputText, setInputText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   
-  const [greeting, setGreeting] = useState('Good Day')
-
-  useEffect(() => {
-    const hr = new Date().getHours()
-    if (hr < 12) setGreeting('Good Morning')
-    else if (hr < 18) setGreeting('Good Afternoon')
-    else setGreeting('Good Evening')
-  }, [])
 
   const thread = [...thoughts]
+    .filter(t => !t.folderId && !t.canvasId && t.type !== 'ai')
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 20)
 
@@ -172,33 +150,32 @@ export default function DashboardView({
       flex: 1,
       display: 'flex',
       flexDirection: 'column',
-      padding: '40px 40px',
-      gap: 32,
+      padding: '32px 40px',
+      gap: 28,
       height: '100%',
       overflowY: 'auto',
-      background: '#f8fafc',
+      background: 'var(--page)',
     }} className="no-scroll">
       
       {/* Header with Greeting & Profile */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{
-            fontSize: 28, fontWeight: 700,
-            color: '#0f172a', margin: 0, letterSpacing: '-0.03em',
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{
+            fontFamily: 'DM Mono, monospace',
+            fontSize: 28, fontWeight: 300, color: '#000000',
+            letterSpacing: '-0.02em',
           }}>
-            {greeting}
-          </h1>
-          <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0', fontWeight: 400 }}>
-            Here is your thinking workspace.
-          </p>
+            co<span style={{ color: '#000000' }}>*</span>think
+          </span>
         </div>
         
-        <div style={{
-          width: 44, height: 44, borderRadius: '50%',
-          background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#64748b', cursor: 'pointer', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-        }}>
-          <User size={20} />
+        <div 
+          className="icon-btn scale-on-press"
+          style={{
+            width: 36, height: 36, borderRadius: '50%',
+          }}
+        >
+          <User size={18} />
         </div>
       </div>
 
@@ -216,8 +193,7 @@ export default function DashboardView({
             icon={FolderIcon}
             title="Folders"
             onOpen={() => {
-              if (folders.length > 0) onSetView({ type: 'folder', folderId: folders[0].id })
-              else setCreatingFolder(true)
+              onSetView({ type: 'folders' })
             }}
             onCreate={() => {
               setCreatingFolder(true)
@@ -230,7 +206,7 @@ export default function DashboardView({
                 padding: '10px 12px', borderRadius: 10,
                 border: '1px solid #cbd5e1', background: '#fff', marginBottom: 6,
               }}>
-                <FolderIcon size={16} color="#94a3b8" />
+                <FolderIcon size={18} color="#94a3b8" />
                 <input
                   ref={folderInputRef}
                   value={newFolder}
@@ -275,24 +251,16 @@ export default function DashboardView({
                         cursor: 'pointer', transition: 'all 0.15s',
                         position: 'relative'
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#e2e8f0' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = 'transparent' }}
                     >
-                      <FolderIcon size={18} color="#64748b" />
+                      <FolderIcon size={20} color="#64748b" />
                       <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>{f.name}</span>
                       
                       <button 
                         onClick={(e) => confirmDeleteFolder(e, f.id, f.name)}
                         className="delete-btn"
-                        style={{
-                          background: 'none', border: 'none', color: '#ef4444', padding: '4px', cursor: 'pointer',
-                          opacity: 0, transition: 'opacity 0.1s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '0'}
                         title="Delete Folder"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   )
@@ -306,8 +274,7 @@ export default function DashboardView({
             icon={CanvasIcon}
             title="Canvases"
             onOpen={() => {
-              if (canvases.length > 0) onSetView({ type: 'canvas', canvasId: canvases[0].id })
-              else setCreatingCanvas(true)
+              onSetView({ type: 'canvases' })
             }}
             onCreate={() => {
               setCreatingCanvas(true)
@@ -320,7 +287,7 @@ export default function DashboardView({
                 padding: '10px 12px', borderRadius: 10,
                 border: '1px solid #cbd5e1', background: '#fff', marginBottom: 6,
               }}>
-                <CanvasIcon size={16} color="#94a3b8" />
+                <CanvasIcon size={18} color="#94a3b8" />
                 <input
                   ref={canvasInputRef}
                   value={newCanvas}
@@ -355,7 +322,7 @@ export default function DashboardView({
                       onDrop={e => {
                         e.preventDefault()
                         const tId = e.dataTransfer.getData('text/plain')
-                        if (tId) onUpdate(tId, { canvasId: c.id, canvasX: 100, canvasY: 100 })
+                        if (tId) onUpdate(tId, { canvasId: c.id, x: 100, y: 100 })
                       }}
                       className="dashboard-item"
                       style={{
@@ -364,24 +331,16 @@ export default function DashboardView({
                         background: '#f8fafc', border: '1px solid transparent',
                         cursor: 'pointer', transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#e2e8f0' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = 'transparent' }}
                     >
-                      <CanvasIcon size={18} color="#64748b" />
+                      <CanvasIcon size={20} color="#64748b" />
                       <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>{c.name}</span>
                       
                       <button 
                         onClick={(e) => confirmDeleteCanvas(e, c.id, c.name)}
                         className="delete-btn"
-                        style={{
-                          background: 'none', border: 'none', color: '#ef4444', padding: '4px', cursor: 'pointer',
-                          opacity: 0, transition: 'opacity 0.1s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '0'}
                         title="Delete Canvas"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   )
@@ -395,108 +354,21 @@ export default function DashboardView({
         <div style={{ flex: '1.2', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <Section
             icon={MessageSquare}
-            title="Thread"
+            title="Captures"
             onOpen={() => onSetView({ type: 'home' })}
-            onCreate={() => onSetView({ type: 'home' })}
           >
             {thread.length === 0 ? (
               <Empty label="No thoughts yet" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {thread.map(t => (
-                  <ThoughtRow key={t.id} thought={t} onPin={onPin} onDelete={onDelete} onMove={onMove} />
+                {thread.map((t, idx) => (
+                  <ThoughtRow key={t.id} thought={t} index={idx} onPin={onPin} onDelete={onDelete} onMove={onMove} />
                 ))}
               </div>
             )}
           </Section>
           
-          {/* Redesigned Input Bar placed right under the thread */}
-          <div style={{
-            marginTop: 24,
-            display: 'flex', gap: 12,
-            alignItems: 'center'
-          }}>
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center',
-              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999,
-              padding: '4px 8px 4px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <button
-                onClick={() => setIsRecording(!isRecording)}
-                style={{
-                  background: 'none', border: 'none', padding: 8, cursor: 'pointer',
-                  color: isRecording ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}
-              >
-                <Mic size={18} />
-              </button>
-              
-              <input 
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && inputText.trim()) {
-                    onAdd({ type: 'text', content: inputText.trim() })
-                    setInputText('')
-                  }
-                }}
-                placeholder={isRecording ? 'Listening...' : 'Type a thought...'}
-                style={{
-                  flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                  padding: '8px 12px', fontSize: 14, color: '#0f172a'
-                }}
-              />
 
-              {inputText.trim() && (
-                <button
-                  onClick={() => {
-                    onAdd({ type: 'text', content: inputText.trim() })
-                    setInputText('')
-                  }}
-                  style={{
-                    background: '#3b82f6', border: 'none', borderRadius: '50%',
-                    width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', cursor: 'pointer', marginRight: 4, transition: 'background 0.1s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
-                  title="Send"
-                >
-                  <ArrowUp size={16} />
-                </button>
-              )}
-              
-              <button
-                onClick={onOpenCapture}
-                style={{
-                  background: '#0f172a', border: 'none', borderRadius: '50%',
-                  width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', cursor: 'pointer'
-                }}
-                title="Add Media / Canvas Tool"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            
-            <button
-              onClick={onOpenAI}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                height: 42, padding: '0 20px',
-                borderRadius: 999,
-                border: '1px solid #e2e8f0',
-                background: '#fff', color: '#0f172a',
-                fontSize: 14, fontWeight: 500,
-                transition: 'all 0.12s',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
-              }}
-              onMouseEnter={e => { (e.currentTarget).style.background = '#f8fafc'; (e.currentTarget).style.borderColor = '#cbd5e1' }}
-              onMouseLeave={e => { (e.currentTarget).style.background = '#fff'; (e.currentTarget).style.borderColor = '#e2e8f0' }}
-            >
-              <Sparkles size={16} color="#8b5cf6" /> AI
-            </button>
-          </div>
         </div>
 
       </div>

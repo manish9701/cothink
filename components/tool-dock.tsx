@@ -44,11 +44,12 @@ function ThinkingDots() {
 /* ─── Voice Recorder ──────────────────────────────────────── */
 function VoiceRecorder({
   onSave, onCancel,
-}: { onSave: (blob: Blob, duration: string) => void; onCancel: () => void }) {
+}: { onSave: (dataUrl: string, durationStr: string, caption: string) => void; onCancel: () => void }) {
   const [state, setState] = useState<'idle' | 'recording' | 'done'>('idle')
   const [seconds, setSeconds] = useState(0)
-  const [blob, setBlob] = useState<Blob | null>(null)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [durationStr, setDurationStr] = useState('0:00')
+  const [caption, setCaption] = useState('')
   const [permError, setPermError] = useState(false)
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -71,7 +72,7 @@ function VoiceRecorder({
       mr.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data) }
       mr.onstop = () => {
         const b = new Blob(chunksRef.current, { type: 'audio/webm' })
-        setBlob(b)
+        setBlobUrl(URL.createObjectURL(b))
         setState('done')
         stream.getTracks().forEach(t => t.stop())
       }
@@ -196,16 +197,24 @@ function VoiceRecorder({
           <p className="text-[12px]" style={{ color: 'var(--ink-3)' }}>{durationStr}</p>
         </div>
       </div>
+      <input
+        type="text"
+        placeholder="Add context (optional)..."
+        value={caption}
+        onChange={e => setCaption(e.target.value)}
+        className="w-full px-3 py-2.5 rounded-xl text-[13px]"
+        style={{ background: 'var(--surface-3)', border: '1px solid var(--border-light)', color: 'var(--ink)' }}
+      />
       <div className="flex gap-2">
         <button
-          onClick={() => { setState('idle'); setBlob(null) }}
+          onClick={() => { setState('idle'); setBlobUrl(null); setCaption('') }}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
           style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
         >
           <RotateCcw size={13} /> Redo
         </button>
         <button
-          onClick={() => blob && onSave(blob, durationStr)}
+          onClick={() => blobUrl && onSave(blobUrl, durationStr, caption.trim() || 'Voice memo')}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
           style={{ background: 'var(--sky)', color: 'white' }}
         >
@@ -219,12 +228,13 @@ function VoiceRecorder({
 /* ─── Camera Capture ──────────────────────────────────────── */
 function CameraCapture({
   onSave, onCancel,
-}: { onSave: (dataUrl: string) => void; onCancel: () => void }) {
+}: { onSave: (dataUrl: string, caption: string) => void; onCancel: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [ready, setReady] = useState(false)
   const [captured, setCaptured] = useState<string | null>(null)
+  const [caption, setCaption] = useState('')
   const [permError, setPermError] = useState(false)
 
   useEffect(() => {
@@ -254,19 +264,6 @@ function CameraCapture({
     c.getContext('2d')?.drawImage(v, 0, 0)
     setCaptured(c.toDataURL('image/jpeg', 0.92))
     streamRef.current?.getTracks().forEach(t => t.stop())
-  }
-
-  const retake = () => {
-    setCaptured(null)
-    setReady(false)
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(stream => {
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.onloadedmetadata = () => setReady(true)
-        }
-      }).catch(() => {})
   }
 
   if (permError) {
@@ -301,40 +298,49 @@ function CameraCapture({
           </div>
         )}
         <canvas ref={canvasRef} className="hidden" />
-        {/* Viewfinder corners */}
-        {!captured && ready && (
-          <>
-            <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-white/60 rounded-tl-sm" />
-            <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-white/60 rounded-tr-sm" />
-            <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-white/60 rounded-bl-sm" />
-            <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-white/60 rounded-br-sm" />
-          </>
-        )}
       </div>
+      {captured && (
+        <input
+          type="text"
+          placeholder="Add context (optional)..."
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+          className="w-full px-3 py-2.5 rounded-xl text-[13px]"
+          style={{ background: 'var(--surface-3)', border: '1px solid var(--border-light)', color: 'var(--ink)' }}
+        />
+      )}
       <div className="flex gap-2">
         {!captured ? (
-          <button
-            onClick={snap}
-            disabled={!ready}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold disabled:opacity-40 transition-opacity hover:opacity-85"
-            style={{ background: 'var(--sage)', color: 'white' }}
-          >
-            <Camera size={15} />
-            Capture
-          </button>
+          <>
+            <button
+              onClick={onCancel}
+              className="flex-1 py-2.5 rounded-2xl text-[13px] font-medium"
+              style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={snap}
+              disabled={!ready}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold disabled:opacity-40"
+              style={{ background: 'var(--ink)', color: 'white' }}
+            >
+              <Camera size={13} /> Take photo
+            </button>
+          </>
         ) : (
           <>
             <button
-              onClick={retake}
+              onClick={() => { setCaptured(null); setCaption('') }}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
               style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
             >
               <RotateCcw size={13} /> Retake
             </button>
             <button
-              onClick={() => captured && onSave(captured)}
+              onClick={() => onSave(captured, caption.trim())}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
-              style={{ background: 'var(--sage)', color: 'white' }}
+              style={{ background: 'var(--ink)', color: 'white' }}
             >
               <Check size={13} /> Save photo
             </button>
@@ -348,7 +354,7 @@ function CameraCapture({
 /* ─── Video Recorder ──────────────────────────────────────── */
 function VideoRecorder({
   onSave, onCancel,
-}: { onSave: (url: string, duration: string) => void; onCancel: () => void }) {
+}: { onSave: (url: string, durationStr: string, caption: string) => void; onCancel: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const mediaRef = useRef<MediaRecorder | null>(null)
@@ -358,6 +364,7 @@ function VideoRecorder({
   const [seconds, setSeconds] = useState(0)
   const [url, setUrl] = useState<string | null>(null)
   const [durationStr, setDurationStr] = useState('0:00')
+  const [caption, setCaption] = useState('')
   const [permError, setPermError] = useState(false)
   const [ready, setReady] = useState(false)
 
@@ -445,44 +452,56 @@ function VideoRecorder({
           </div>
         )}
       </div>
-      <div className="flex gap-2">
-        {state === 'idle' && (
-          <button
-            onClick={startRec}
-            disabled={!ready}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold disabled:opacity-40"
-            style={{ background: '#EF4444', color: 'white' }}
-          >
-            <Video size={15} /> Start recording
-          </button>
-        )}
-        {state === 'recording' && (
-          <button
-            onClick={stopRec}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold"
-            style={{ background: 'var(--ink)', color: 'white' }}
-          >
-            <VideoOff size={15} /> Stop
-          </button>
-        )}
+      <div className="flex gap-2 flex-col">
         {state === 'done' && (
-          <>
+          <input
+            type="text"
+            placeholder="Add context (optional)..."
+            value={caption}
+            onChange={e => setCaption(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl text-[13px]"
+            style={{ background: 'var(--surface-3)', border: '1px solid var(--border-light)', color: 'var(--ink)' }}
+          />
+        )}
+        <div className="flex gap-2">
+          {state === 'idle' && (
             <button
-              onClick={() => { setState('idle'); setUrl(null) }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
-              style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
+              onClick={startRec}
+              disabled={!ready}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold disabled:opacity-40"
+              style={{ background: '#EF4444', color: 'white' }}
             >
-              <RotateCcw size={13} /> Redo
+              <Video size={15} /> Start recording
             </button>
+          )}
+          {state === 'recording' && (
             <button
-              onClick={() => url && onSave(url, durationStr)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
+              onClick={stopRec}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold"
               style={{ background: 'var(--ink)', color: 'white' }}
             >
-              <Check size={13} /> Save video
+              <VideoOff size={15} /> Stop
             </button>
-          </>
-        )}
+          )}
+          {state === 'done' && (
+            <>
+              <button
+                onClick={() => { setState('idle'); setUrl(null); setCaption('') }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
+                style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
+              >
+                <RotateCcw size={13} /> Redo
+              </button>
+              <button
+                onClick={() => url && onSave(url, durationStr, caption.trim())}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
+                style={{ background: 'var(--ink)', color: 'white' }}
+              >
+                <Check size={13} /> Save video
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -491,9 +510,10 @@ function VideoRecorder({
 /* ─── Draw Canvas ─────────────────────────────────────────── */
 function DrawCanvas({
   onSave, onCancel,
-}: { onSave: (dataUrl: string) => void; onCancel: () => void }) {
+}: { onSave: (dataUrl: string, caption: string) => void; onCancel: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [drawing, setDrawing] = useState(false)
+  const [caption, setCaption] = useState('')
   const [brushSize, setBrushSize] = useState(3)
   const [brushColor, setBrushColor] = useState('#1A1916')
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen')
@@ -650,6 +670,14 @@ function DrawCanvas({
         onPointerLeave={onPointerUp}
       />
 
+      <input
+        type="text"
+        placeholder="Add context (optional)..."
+        value={caption}
+        onChange={e => setCaption(e.target.value)}
+        className="w-full px-3 py-2.5 rounded-xl text-[13px]"
+        style={{ background: 'var(--surface-3)', border: '1px solid var(--border-light)', color: 'var(--ink)' }}
+      />
       <div className="flex gap-2">
         <button
           onClick={onCancel}
@@ -659,7 +687,7 @@ function DrawCanvas({
           Cancel
         </button>
         <button
-          onClick={() => canvasRef.current && onSave(canvasRef.current.toDataURL('image/png'))}
+          onClick={() => canvasRef.current && onSave(canvasRef.current.toDataURL('image/png'), caption.trim())}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
           style={{ background: 'var(--ink)', color: 'white' }}
         >
@@ -673,10 +701,11 @@ function DrawCanvas({
 /* ─── Image Upload ────────────────────────────────────────── */
 function ImageUpload({
   onSave, onCancel,
-}: { onSave: (dataUrl: string) => void; onCancel: () => void }) {
+}: { onSave: (dataUrl: string, caption: string) => void; onCancel: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [caption, setCaption] = useState('')
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -726,34 +755,36 @@ function ImageUpload({
           />
         </div>
       ) : (
-        <div className="rounded-2xl overflow-hidden relative" style={{ border: '1px solid var(--border-light)' }}>
-          <img src={preview} alt="upload preview" className="w-full object-cover max-h-64" />
+        <div className="flex flex-col gap-2">
+          <div className="rounded-2xl overflow-hidden relative" style={{ border: '1px solid var(--border-light)' }}>
+            <img src={preview} alt="upload preview" className="w-full object-cover max-h-64" />
+          </div>
+          <input
+            type="text"
+            placeholder="Add context (optional)..."
+            value={caption}
+            onChange={e => setCaption(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl text-[13px]"
+            style={{ background: 'var(--surface-3)', border: '1px solid var(--border-light)', color: 'var(--ink)' }}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setPreview(null); setCaption('') }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
+              style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
+            >
+              <RotateCcw size={13} /> Change
+            </button>
+            <button
+              onClick={() => preview && onSave(preview, caption.trim())}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold"
+              style={{ background: 'var(--ink)', color: 'white' }}
+            >
+              <Check size={13} /> Save photo
+            </button>
+          </div>
         </div>
       )}
-      <div className="flex gap-2">
-        <button
-          onClick={() => {
-            if (!preview) {
-              onCancel()
-            } else {
-              setPreview(null)
-              if (fileRef.current) fileRef.current.value = ''
-            }
-          }}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-medium"
-          style={{ background: 'var(--surface-3)', color: 'var(--ink-2)', border: '1px solid var(--border-light)' }}
-        >
-          {preview ? <><RotateCcw size={13} /> Change</> : 'Cancel'}
-        </button>
-        <button
-          disabled={!preview}
-          onClick={() => preview && onSave(preview)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[13px] font-semibold disabled:opacity-40"
-          style={{ background: 'var(--amber)', color: 'white' }}
-        >
-          <Check size={13} /> Add photo
-        </button>
-      </div>
     </div>
   )
 }
@@ -983,11 +1014,7 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Voice ── */}
             {active === 'voice' && (
               <VoiceRecorder
-                onSave={async (blob, duration) => {
-                  const url = await blobToBase64(blob)
-                  onAdd({ type: 'voice', content: 'Voice memo', voiceUrl: url, voiceDuration: duration })
-                  close()
-                }}
+                onSave={(url, duration, caption) => { onAdd({ type: 'voice', content: caption || 'Voice memo', voiceUrl: url, voiceDuration: duration }); close() }}
                 onCancel={close}
               />
             )}
@@ -995,7 +1022,7 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Photo ── */}
             {active === 'photo' && (
               <CameraCapture
-                onSave={dataUrl => { onAdd({ type: 'photo', content: '', mediaUrl: dataUrl }); close() }}
+                onSave={(dataUrl, caption) => { onAdd({ type: 'photo', content: caption, mediaUrl: dataUrl }); close() }}
                 onCancel={close}
               />
             )}
@@ -1003,7 +1030,7 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Video ── */}
             {active === 'video' && (
               <VideoRecorder
-                onSave={(url, duration) => { onAdd({ type: 'video', content: '', mediaUrl: url, voiceDuration: duration }); close() }}
+                onSave={(url, duration, caption) => { onAdd({ type: 'video', content: caption, mediaUrl: url, voiceDuration: duration }); close() }}
                 onCancel={close}
               />
             )}
@@ -1011,7 +1038,7 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Draw ── */}
             {active === 'draw' && (
               <DrawCanvas
-                onSave={dataUrl => { onAdd({ type: 'draw', content: '', mediaUrl: dataUrl }); close() }}
+                onSave={(dataUrl, caption) => { onAdd({ type: 'draw', content: caption, mediaUrl: dataUrl }); close() }}
                 onCancel={close}
               />
             )}
@@ -1019,7 +1046,7 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Upload ── */}
             {active === 'upload' && (
               <ImageUpload
-                onSave={dataUrl => { onAdd({ type: 'photo', content: '', mediaUrl: dataUrl }); close() }}
+                onSave={(dataUrl, caption) => { onAdd({ type: 'photo', content: caption, mediaUrl: dataUrl }); close() }}
                 onCancel={close}
               />
             )}

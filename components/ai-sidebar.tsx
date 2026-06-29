@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, ArrowUp, Sparkles, Layout } from 'lucide-react'
+import { X, ArrowUp, Sparkles, BookOpen } from 'lucide-react'
 import type { Thought } from '@/lib/thought-types'
 
 interface Props {
@@ -21,8 +21,8 @@ interface ChatMessage {
 const PROMPTS = [
   'What pattern do I keep circling?',
   "Where's the weakest assumption?",
-  "What's the next question to ask?",
-  'Compress this into one sentence',
+  "What's the next question?",
+  'Compress to one sentence',
 ]
 
 async function streamInsight(
@@ -92,13 +92,35 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80) }, [])
+  useEffect(() => {
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100)
+  }, [isOpen])
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      fetch('/api/chat')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setMessages(data)
+        })
+        .catch(() => {})
+    }
+  }, [isOpen])
+
+  const saveMessage = async (id: string, role: string, content: string) => {
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, role, content }),
+      })
+    } catch {}
+  }
 
   const submit = useCallback(async (q: string = query) => {
     const trimmed = q.trim()
@@ -109,9 +131,11 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
     const ctrl = new AbortController()
     abortRef.current = ctrl
 
-    // Add user message
     const userId = crypto.randomUUID()
     const aiId = crypto.randomUUID()
+
+    // Save user message immediately
+    saveMessage(userId, 'user', trimmed)
 
     setMessages(prev => [
       ...prev,
@@ -133,60 +157,62 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
         },
         ctrl.signal
       )
-      // Mark streaming done
       setMessages(prev =>
         prev.map(m => m.id === aiId ? { ...m, streaming: false } : m)
       )
+      // Save AI message after completion
+      saveMessage(aiId, 'ai', accumulated)
     } catch {
       if (ctrl.signal.aborted) return
       const fallback = 'Name the core assumption. Write the opposite version. Compare which explains more.'
       setMessages(prev =>
         prev.map(m => m.id === aiId ? { ...m, content: fallback, streaming: false } : m)
       )
+      saveMessage(aiId, 'ai', fallback)
     } finally {
       setBusy(false)
     }
   }, [query, busy, thoughts])
 
-  const synthesizeToCanvas = useCallback((content: string) => {
-    onAdd({ type: 'ai', content })
-  }, [onAdd])
-
   return (
-    <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0, width: 380,
-      background: '#fff', borderLeft: '1px solid #e2e8f0',
-      transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-      transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-      zIndex: 50, display: 'flex', flexDirection: 'column',
-      boxShadow: isOpen ? '-4px 0 24px rgba(0,0,0,0.05)' : 'none',
-    }}>
-      {/* Header */}
-      <div style={{ flexShrink: 0, padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 10,
-            background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
+    <div
+      className={`ai-sidebar-panel ${isOpen ? 'open' : 'closed'}`}
+      onClick={e => e.stopPropagation()}
+    >
+        {/* Header */}
+        <div style={{
+          flexShrink: 0,
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--zinc-100)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: 'var(--zinc-900)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
               <Sparkles size={16} color="white" />
             </div>
             <div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--zinc-900)', letterSpacing: '-0.02em' }}>
                 Thinking Agent
               </p>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--zinc-400)' }}>
-                {thoughts.length} thoughts in context
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--zinc-400)', letterSpacing: '-0.01em', fontWeight: 500 }}>
+                {thoughts.length} thought{thoughts.length !== 1 ? 's' : ''} in context
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ width: 28, height: 28, borderRadius: 8, background: 'none', border: 'none', color: 'var(--zinc-500)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}
-            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--zinc-100)'}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}
+            style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--zinc-100)', border: 'none', color: 'var(--zinc-500)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s', cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--zinc-200)'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--zinc-100)'}
+            title="Close"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
 
@@ -194,22 +220,46 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
         <div
           ref={scrollRef}
           className="chat-messages no-scroll"
-          style={{ flexShrink: 1, minHeight: 0, flex: 1 }}
         >
           {messages.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8, opacity: 0.5 }}>
-              <Sparkles size={32} color="var(--zinc-400)" />
-              <p style={{ fontSize: 13, color: 'var(--zinc-400)', margin: 0 }}>Ask anything about your thoughts</p>
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              height: '100%', gap: 12, padding: '40px 24px',
+              textAlign: 'center',
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: 'var(--zinc-50)', border: '1px solid var(--zinc-200)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Sparkles size={24} color="var(--zinc-400)" />
+              </div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--zinc-800)', margin: 0, letterSpacing: '-0.01em' }}>
+                Ask about your thoughts
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--zinc-500)', margin: 0, lineHeight: 1.6 }}>
+                Explore patterns, surface insights, or get help thinking something through.
+              </p>
             </div>
           )}
 
           {messages.map(msg => (
-            <div key={msg.id} className={`chat-bubble-row ${msg.role}`}>
+            <div key={msg.id} className={`chat-bubble-row ${msg.role}`} style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-start', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
               {msg.role === 'ai' && (
-                <div className="chat-avatar"><Sparkles size={14} /></div>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: 'var(--zinc-900)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Sparkles size={14} color="white" />
+                </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '80%', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                display: 'flex', flexDirection: 'column',
+                gap: 4, maxWidth: '85%',
+                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              }}>
                 {msg.streaming && msg.content === '' ? (
                   <div className="chat-thinking">
                     <div className="chat-thinking-dot" />
@@ -217,30 +267,27 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
                     <div className="chat-thinking-dot" />
                   </div>
                 ) : (
-                  <div className={`chat-bubble ${msg.role}`}>
+                  <div style={{
+                    padding: msg.role === 'user' ? '10px 14px' : '0 4px',
+                    background: msg.role === 'user' ? 'var(--zinc-100)' : 'transparent',
+                    borderRadius: msg.role === 'user' ? 16 : 0,
+                    borderBottomRightRadius: msg.role === 'user' ? 4 : 0,
+                    fontSize: 14, color: 'var(--zinc-900)', lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                  }}>
                     {msg.content}
                     {msg.streaming && <span className="ai-cursor" />}
-                  </div>
-                )}
-
-                {/* Synthesize button for AI messages */}
-                {msg.role === 'ai' && !msg.streaming && msg.content && (
-                  <div className="chat-bubble-actions">
-                    <button
-                      className="chat-synth-btn"
-                      onClick={() => synthesizeToCanvas(msg.content)}
-                      title="Add to Canvas"
-                    >
-                      <Layout size={12} />
-                      Synthesize to Canvas
-                    </button>
                   </div>
                 )}
               </div>
 
               {msg.role === 'user' && (
-                <div className="chat-avatar" style={{ background: 'var(--zinc-900)', color: 'white' }}>
-                  <span style={{ fontSize: 12, fontFamily: 'inherit' }}>You</span>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: 'var(--zinc-100)', color: 'var(--zinc-600)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
+                }}>
+                  You
                 </div>
               )}
             </div>
@@ -248,42 +295,60 @@ export default function AISidebar({ isOpen, thoughts, onAdd, onClose }: Props) {
         </div>
 
         {/* Input area */}
-        <div className="chat-input-area" style={{ flexShrink: 0 }}>
-          {/* Quick prompts */}
-          <div className="chat-prompts">
+        <div style={{ padding: '16px 20px 24px', borderTop: '1px solid var(--zinc-100)', background: 'white' }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }} className="no-scroll">
             {PROMPTS.map(p => (
               <button
                 key={p}
-                className="chat-prompt-chip"
                 onClick={() => submit(p)}
                 disabled={busy}
+                style={{
+                  padding: '6px 12px', borderRadius: 16, border: '1px solid var(--zinc-200)',
+                  background: 'var(--zinc-50)', fontSize: 12, color: 'var(--zinc-600)', whiteSpace: 'nowrap',
+                  cursor: busy ? 'default' : 'pointer', transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => !busy && (e.currentTarget.style.background = 'var(--zinc-100)')}
+                onMouseLeave={e => !busy && (e.currentTarget.style.background = 'var(--zinc-50)')}
               >
                 {p}
               </button>
             ))}
           </div>
 
-          {/* Input */}
-          <div className="chat-input-row">
+          <div style={{
+            display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 12px',
+            background: 'var(--zinc-50)', borderRadius: 16, border: '1px solid var(--zinc-200)',
+            transition: 'border-color 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+          }}>
             <textarea
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
               disabled={busy}
-              placeholder="Ask about your thoughts… (Enter to send)"
-              rows={2}
-              className="chat-textarea no-scroll"
+              placeholder="Ask anything… (Enter to send)"
+              rows={1}
+              className="no-scroll"
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                resize: 'none', fontSize: 14, color: 'var(--zinc-900)',
+                padding: '4px 0', minHeight: 24, maxHeight: 120, lineHeight: 1.5,
+              }}
             />
             <button
-              className="chat-send-btn"
               onClick={() => submit()}
               disabled={!query.trim() || busy}
+              style={{
+                width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                background: (!query.trim() || busy) ? 'var(--zinc-200)' : 'var(--zinc-900)',
+                color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: (!query.trim() || busy) ? 'not-allowed' : 'pointer', transition: 'all 0.2s'
+              }}
             >
-              <ArrowUp size={14} />
+              <ArrowUp size={16} />
             </button>
           </div>
+        </div>
       </div>
-    </div>
   )
 }

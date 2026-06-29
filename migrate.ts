@@ -35,6 +35,17 @@ async function migrate() {
       ALTER TABLE "thoughts" ADD COLUMN IF NOT EXISTS "scale" double precision;
     `);
 
+    console.log('Creating chat_messages table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "chat_messages" (
+        "id" text PRIMARY KEY NOT NULL,
+        "user_id" text DEFAULT 'demo' NOT NULL,
+        "role" text NOT NULL,
+        "content" text NOT NULL,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
     console.log('✅ All tables and columns updated successfully!');
     await client.end();
     

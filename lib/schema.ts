@@ -55,3 +55,11 @@ export const thoughtsRelations = relations(thoughts, ({ one }) => ({
     references: [canvases.id],
   }),
 }))
+
+export const chatMessages = pgTable('chat_messages', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().default('demo'),
+  role: text('role').notNull(), // 'user' or 'ai'
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})

@@ -66,26 +66,7 @@ export async function GET() {
       scale: t.scale !== null ? t.scale : undefined,
     }))
 
-    if (folders.length === 0 && canvases.length === 0 && thoughts.length === 0) {
-      // Seed Database
-      await db.insert(foldersTable).values([
-        { id: 'f1', userId: USER_ID, name: 'Cothink ideas', createdAt: new Date() },
-        { id: 'f2', userId: USER_ID, name: 'Engineering Specs', createdAt: new Date() },
-      ])
-      await db.insert(canvasesTable).values([
-        { id: 'c1', userId: USER_ID, name: 'Architecture Diagram', createdAt: new Date() },
-        { id: 'c2', userId: USER_ID, name: 'UI/UX Moodboard', createdAt: new Date() },
-      ])
-      await db.insert(thoughtsTable).values([
-        { id: '1', userId: USER_ID, type: 'text', content: 'Explore the concept of "Agentic Workflows" for the new framework.', createdAt: new Date(Date.now() - 1000 * 60 * 44), folderId: 'f1', pinned: true },
-        { id: '2', userId: USER_ID, type: 'ai', content: 'Agentic workflows involve defining high-level goals and letting the AI dynamically plan and execute steps.', createdAt: new Date(Date.now() - 1000 * 60 * 38), folderId: 'f1' },
-        { id: '3', userId: USER_ID, type: 'text', content: 'Need to review the new WebRTC implementation for live audio streaming: https://webrtc.org', createdAt: new Date(Date.now() - 1000 * 60 * 28) },
-        { id: '4', userId: USER_ID, type: 'voice', content: 'Design ideas for the new dashboard...', createdAt: new Date(Date.now() - 1000 * 60 * 15), voiceDuration: '1:12', canvasId: 'c1', x: 200, y: 150 },
-        { id: '5', userId: USER_ID, type: 'text', content: 'Complexity is often a sign that the model is wrong, not that the idea is hard.', createdAt: new Date(Date.now() - 1000 * 60 * 11) },
-      ])
-      // Re-fetch
-      return GET()
-    }
+    // Seed logic removed to prevent overriding client state when empty
 
     return NextResponse.json({ configured: true, thoughts, folders, canvases })
   } catch (error) {
