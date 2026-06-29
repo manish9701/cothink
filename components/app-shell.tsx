@@ -543,7 +543,7 @@ export default function AppShell() {
                 <User size={18} />
               </div>
             </div>
-            <CanvasView thoughts={canvasThoughts} allThoughts={thoughts} canvasId={activeCanvas.id} onAdd={add} onDelete={del} onUpdate={update} onOpenCapture={() => setShowCapture(true)} />
+            <CanvasView thoughts={canvasThoughts} allThoughts={thoughts} folders={folders} canvasId={activeCanvas.id} onAdd={add} onDelete={del} onUpdate={update} onOpenCapture={() => setShowCapture(true)} />
           </div>
         )}
 

@@ -29,7 +29,7 @@ function ThoughtPreview({ thought }: { thought: Thought }) {
         <p style={{
           fontSize: 15, lineHeight: 1.6, color: thought.type === 'ai' ? '#6d28d9' : 'var(--zinc-800)',
           margin: 0, fontStyle: thought.type === 'ai' ? 'italic' : 'normal',
-          whiteSpace: 'pre-wrap', flex: 1, overflowY: 'auto'
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1, overflowY: 'auto'
         }} className="no-scroll">
           {thought.content}
         </p>
@@ -123,11 +123,11 @@ export default function MoveModal({ thought, folders, canvases, onClose, onSelec
         
         {/* Left Pane: Preview */}
         <div style={{
-          width: 320, background: '#fafafa', borderRight: '1px solid rgba(0,0,0,0.04)',
+          width: 320, minWidth: 0, flexShrink: 0, background: '#fafafa', borderRight: '1px solid rgba(0,0,0,0.04)',
           padding: '28px 24px', display: 'flex', flexDirection: 'column'
         }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--zinc-900)', margin: '0 0 20px 0', letterSpacing: '-0.02em' }}>Move Item</h2>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             {thought ? <ThoughtPreview thought={thought} /> : (
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--zinc-400)' }}>
                 Item not found
@@ -137,7 +137,7 @@ export default function MoveModal({ thought, folders, canvases, onClose, onSelec
         </div>
 
         {/* Right Pane: Destinations */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
           <div style={{ padding: '28px 24px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
             <div style={{ position: 'relative', flex: 1, marginRight: 16 }}>
               <input

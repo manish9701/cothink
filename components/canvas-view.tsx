@@ -656,7 +656,7 @@ export default function CanvasView({ thoughts, allThoughts = [], folders = [], c
             overflow: 'hidden', animation: 'scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Left Sidebar */}
-            <div style={{ width: 220, borderRight: '1px solid var(--zinc-150)', background: 'var(--zinc-50)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 220, minWidth: 0, flexShrink: 0, borderRight: '1px solid var(--zinc-150)', background: 'var(--zinc-50)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--zinc-150)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--zinc-900)' }}>Library</span>
               </div>
@@ -695,7 +695,7 @@ export default function CanvasView({ thoughts, allThoughts = [], folders = [], c
             </div>
 
             {/* Right Content */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: '#fff' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--zinc-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <input
                   type="text"
