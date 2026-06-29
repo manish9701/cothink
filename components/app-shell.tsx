@@ -299,46 +299,30 @@ export default function AppShell() {
 
   /* ── Persistence ── */
   useEffect(() => {
-    const seeded = localStorage.getItem('te.seeded')
-    if (seeded !== 'v5') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED.map(serializeThought)))
-      localStorage.setItem(FOLDERS_KEY, JSON.stringify(SEED_FOLDERS))
-      localStorage.setItem(CANVASES_KEY, JSON.stringify(SEED_CANVASES))
-      localStorage.setItem('te.seeded', 'v5')
-      setThoughts(SEED)
-      setFolders(SEED_FOLDERS)
-      setCanvases(SEED_CANVASES)
-      hydrated.current = true
-    } else {
-      const t = deserialize(localStorage.getItem(STORAGE_KEY))
-      if (t?.length) setThoughts(t)
-      try { const f = localStorage.getItem(FOLDERS_KEY); if (f) setFolders(JSON.parse(f)) } catch {}
-      try { const c = localStorage.getItem(CANVASES_KEY); if (c) setCanvases(JSON.parse(c)) } catch {}
+    loadRemote().then(r => {
+      if (r) {
+        const hasThoughts = r.thoughts && r.thoughts.length > 0
+        const hasFolders = r.folders && r.folders.length > 0
+        const hasCanvases = r.canvases && r.canvases.length > 0
 
-      loadRemote().then(r => {
-        if (r) {
-          if (r.thoughts?.length) setThoughts(r.thoughts)
-          if (r.folders?.length) setFolders(r.folders)
-          if (r.canvases?.length) setCanvases(r.canvases)
+        if (hasThoughts || hasFolders || hasCanvases) {
+          if (r.thoughts) setThoughts(r.thoughts)
+          if (r.folders) setFolders(r.folders)
+          if (r.canvases) setCanvases(r.canvases)
+        } else {
+          // If the PostgreSQL database is empty, seed it with the initial mock data
+          setThoughts(SEED)
+          setFolders(SEED_FOLDERS)
+          setCanvases(SEED_CANVASES)
+          saveRemote(SEED, SEED_FOLDERS, SEED_CANVASES)
         }
-      }).finally(() => { hydrated.current = true })
-    }
+      }
+    }).finally(() => { hydrated.current = true })
   }, [])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(thoughts.map(serializeThought)))
     if (hydrated.current) saveRemote(thoughts, folders, canvases)
-  }, [thoughts])
-
-  useEffect(() => {
-    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
-    if (hydrated.current) saveRemote(thoughts, folders, canvases)
-  }, [folders])
-
-  useEffect(() => {
-    localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases))
-    if (hydrated.current) saveRemote(thoughts, folders, canvases)
-  }, [canvases])
+  }, [thoughts, folders, canvases])
 
   useEffect(() => {
     return initShortcuts([
