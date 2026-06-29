@@ -1,167 +1,272 @@
 'use client'
 
 import { type Thought } from '@/lib/thought-types'
-import { Mic, Play, Pause, ImageIcon, Sparkles, Pin, Trash2, Pencil } from 'lucide-react'
-import { useState, useRef, type CSSProperties } from 'react'
+import { useState, useRef, useMemo } from 'react'
+import { Pin, Trash2, Play, Pause, ArrowRight } from 'lucide-react'
 
-interface Props { thoughts: Thought[]; onPin: (id: string) => void; onDelete: (id: string) => void }
+interface Props { thoughts: Thought[]; onPin: (id: string) => void; onDelete: (id: string) => void; onMove: (id: string) => void }
 
-const TIME_FMT = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-const DATE_FMT = (d: Date) => {
+const TYPE_EMOJI: Record<string, string> = {
+  text: '📝', voice: '🎙️', ai: '✨', photo: '📸', draw: '✏️', video: '🎬',
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  text: 'Note', voice: 'Voice', ai: 'AI Insight', photo: 'Photo', draw: 'Sketch', video: 'Video',
+}
+
+function fmt(d: Date) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function dateFmt(d: Date) {
   const today = new Date()
   const diff = Math.floor((today.getTime() - d.getTime()) / 86400000)
   if (diff === 0) return 'Today'
   if (diff === 1) return 'Yesterday'
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-function WaveBar() {
-  const bars = [0.4, 0.7, 1, 0.6, 0.85, 0.45, 0.75, 0.35, 0.9, 0.55]
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 20 }}>
-      {bars.map((h, i) => (
-        <div key={i} className="wave-bar" style={{ width: 2.5, height: `${h * 100}%`, borderRadius: 2, background: 'var(--zinc-400)', '--d': `${0.6 + (i % 4) * 0.09}s`, '--delay': `${i * 0.04}s` } as CSSProperties} />
-      ))}
-    </div>
-  )
-}
-
-function VoiceRow({ thought }: { thought: Thought }) {
+/* Voice player */
+function VoicePlayer({ thought }: { thought: Thought }) {
   const [playing, setPlaying] = useState(false)
   const audio = useRef<HTMLAudioElement>(null)
   const toggle = () => {
-    if (!audio.current) { setPlaying(p => !p); if (!playing) setTimeout(() => setPlaying(false), 3000); return }
-    if (playing) { audio.current.pause(); setPlaying(false) } else audio.current.play().then(() => setPlaying(true)).catch(() => {})
+    if (!audio.current) { setPlaying(p => !p); return }
+    if (playing) { audio.current.pause(); setPlaying(false) }
+    else audio.current.play().then(() => setPlaying(true)).catch(() => {})
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' }}>
       {thought.voiceUrl && <audio ref={audio} src={thought.voiceUrl} onEnded={() => setPlaying(false)} preload="metadata" />}
-      <button onClick={toggle} style={{ width: 30, height: 30, borderRadius: '50%', background: playing ? 'var(--zinc-900)' : 'var(--zinc-100)', border: '1px solid var(--zinc-200)', color: playing ? 'white' : 'var(--zinc-500)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.14s' }}>
-        {playing ? <Pause size={11} /> : <Play size={11} />}
+      <button
+        onClick={toggle}
+        style={{
+          width: 36, height: 36, borderRadius: '50%',
+          background: '#0f172a', color: '#fff', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {playing ? <Pause size={14} /> : <Play size={14} style={{ marginLeft: 2 }} />}
       </button>
-      <WaveBar />
-      <span style={{ fontSize: 11, color: 'var(--zinc-400)', fontVariantNumeric: 'tabular-nums', fontFamily: 'DM Mono, monospace' }}>{thought.voiceDuration ?? '--'}</span>
+      {/* Static waveform bars */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 24 }}>
+        {[0.3, 0.6, 1, 0.5, 0.8, 0.4, 0.7, 0.3, 0.9, 0.5, 0.65, 0.75, 0.4, 0.85, 0.5].map((h, i) => (
+          <div key={i} style={{
+            width: 2.5, height: `${h * 24}px`,
+            background: playing ? '#6366f1' : '#cbd5e1',
+            borderRadius: 2,
+            transition: 'background 0.2s',
+          }} />
+        ))}
+      </div>
+      <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'DM Mono, monospace', letterSpacing: '0.05em' }}>
+        {thought.voiceDuration ?? '--'}
+      </span>
     </div>
   )
 }
 
-function ThreadItem({ thought, onPin, onDelete }: { thought: Thought; onPin: (id: string) => void; onDelete: (id: string) => void }) {
+/* Single thought row */
+export function ThoughtRow({ thought, onPin, onDelete, onMove }: { thought: Thought; onPin: (id: string) => void; onDelete: (id: string) => void; onMove: (id: string) => void }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
-      className="thread-item"
+      draggable
+      onDragStart={e => e.dataTransfer.setData('text/plain', thought.id)}
+      style={{
+        display: 'flex', gap: 14, padding: '16px 0',
+        borderBottom: '1px solid #f1f5f9',
+        position: 'relative',
+        cursor: 'grab'
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ animationDelay: '0ms' }}
     >
+      {/* Emoji type indicator */}
+      <div style={{ width: 20, paddingTop: 2, flexShrink: 0 }}>
+        <span style={{ fontSize: 15, lineHeight: 1 }}>
+          {TYPE_EMOJI[thought.type] ?? '💭'}
+        </span>
+      </div>
+
       {/* Content */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-        {/* Type label for non-text */}
-        {thought.type === 'ai' && (
-          <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--zinc-400)', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}>
-            <Sparkles size={11} /> AI Insight
-          </span>
-        )}
-        {thought.type === 'voice' && <VoiceRow thought={thought} />}
-        {thought.type === 'photo' && thought.mediaUrl && (
-          <div>
-            <img src={thought.mediaUrl} alt="photo" style={{ maxWidth: 320, borderRadius: 10, border: '1px solid var(--zinc-200)', display: 'block' }} />
-            {thought.content && <p style={{ marginTop: 6, fontSize: 13, color: 'var(--zinc-500)' }}>{thought.content}</p>}
-          </div>
-        )}
-        {(thought.type === 'text' || thought.type === 'ai') && (
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {thought.type === 'text' && (
           <p style={{
-            fontSize: thought.type === 'ai' ? 14 : 15,
-            lineHeight: 1.65,
-            color: thought.type === 'ai' ? 'var(--zinc-500)' : 'var(--zinc-900)',
-            fontWeight: thought.type === 'ai' ? 400 : 450,
-            margin: 0,
-            letterSpacing: '-0.01em',
-            fontStyle: thought.type === 'ai' ? 'italic' : 'normal',
+            margin: 0, fontSize: 15, lineHeight: 1.65,
+            color: '#1e293b', fontWeight: 400,
+            letterSpacing: '-0.012em',
           }}>
             {thought.content}
           </p>
         )}
-        {thought.pinned && (
-          <span style={{ fontSize: 11, color: 'var(--zinc-400)', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <Pin size={10} fill="currentColor" /> Pinned
-          </span>
-        )}
-      </div>
 
-      {/* Right: timestamp + actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <span className="thread-timestamp">{TIME_FMT(thought.createdAt)}</span>
-          <span className="thread-timestamp" style={{ fontSize: 10, opacity: 0.7 }}>{DATE_FMT(thought.createdAt)}</span>
-        </div>
-        {hovered && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              onClick={() => onPin(thought.id)}
-              style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid var(--zinc-200)', background: thought.pinned ? 'var(--zinc-900)' : 'var(--white)', color: thought.pinned ? 'white' : 'var(--zinc-400)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s' }}
-            >
-              <Pin size={11} fill={thought.pinned ? 'currentColor' : 'none'} />
-            </button>
-            <button
-              onClick={() => onDelete(thought.id)}
-              style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid var(--zinc-200)', background: 'var(--white)', color: 'var(--zinc-400)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#FCA5A5'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--zinc-200)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--zinc-400)' }}
-            >
-              <Trash2 size={11} />
-            </button>
+        {thought.type === 'ai' && (
+          <p style={{
+            margin: 0, fontSize: 14, lineHeight: 1.65,
+            color: '#7c3aed', fontStyle: 'italic',
+            letterSpacing: '-0.01em',
+          }}>
+            {thought.content}
+          </p>
+        )}
+
+        {thought.type === 'voice' && <VoicePlayer thought={thought} />}
+
+        {thought.type === 'photo' && thought.mediaUrl && (
+          <div>
+            <img
+              src={thought.mediaUrl}
+              alt="photo"
+              style={{
+                maxWidth: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8,
+                display: 'block', marginTop: 4, border: '1px solid #e2e8f0'
+              }}
+            />
+            {thought.content && (
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: '#64748b' }}>{thought.content}</p>
+            )}
           </div>
         )}
+
+        {thought.type === 'draw' && thought.mediaUrl && (
+          <img
+            src={thought.mediaUrl}
+            alt="sketch"
+            style={{
+              maxWidth: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8,
+              display: 'block', marginTop: 4, background: '#fff',
+              border: '1px solid #e2e8f0'
+            }}
+          />
+        )}
+
+        {thought.type === 'video' && thought.mediaUrl && (
+          <video
+            src={thought.mediaUrl}
+            controls
+            style={{
+              maxWidth: '100%', maxHeight: 120, borderRadius: 8,
+              display: 'block', marginTop: 4, border: '1px solid #e2e8f0'
+            }}
+          />
+        )}
+
+        {/* Metadata */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <span suppressHydrationWarning style={{ fontSize: 11, color: '#94a3b8', letterSpacing: '0.02em' }}>
+            {fmt(thought.createdAt)}
+          </span>
+          {thought.pinned && (
+            <span style={{ fontSize: 11, color: '#f59e0b' }}>📌 Pinned</span>
+          )}
+        </div>
+      </div>
+
+      {/* Hover actions */}
+      <div style={{ display: 'flex', gap: 6, opacity: hovered ? 1 : 0, transition: 'opacity 0.15s', flexShrink: 0 }}>
+        <button
+          onClick={() => onMove(thought.id)}
+          style={{
+            width: 28, height: 28, borderRadius: 8,
+            border: 'none', background: 'transparent',
+            color: '#94a3b8', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = '#f1f5f9'
+            el.style.color = '#3b82f6'
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'transparent'
+            el.style.color = '#94a3b8'
+          }}
+          title="Move thought"
+        >
+          <ArrowRight size={14} />
+        </button>
+        <button
+          onClick={() => onPin(thought.id)}
+          title={thought.pinned ? 'Unpin' : 'Pin'}
+          style={{
+            width: 28, height: 28, borderRadius: 7,
+            border: '1px solid #e2e8f0', background: thought.pinned ? '#fef3c7' : '#fff',
+            color: thought.pinned ? '#f59e0b' : '#94a3b8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.1s',
+          }}
+        >
+          <Pin size={13} />
+        </button>
+        <button
+          onClick={() => onDelete(thought.id)}
+          title="Delete"
+          style={{
+            width: 28, height: 28, borderRadius: 7,
+            border: '1px solid #e2e8f0', background: '#fff',
+            color: '#94a3b8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.1s',
+          }}
+          onMouseEnter={e => { (e.currentTarget).style.color = '#ef4444'; (e.currentTarget).style.borderColor = '#fca5a5' }}
+          onMouseLeave={e => { (e.currentTarget).style.color = '#94a3b8'; (e.currentTarget).style.borderColor = '#e2e8f0' }}
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
     </div>
   )
 }
 
-// Group thoughts by date
-function groupByDate(thoughts: Thought[]): Array<{ label: string; items: Thought[] }> {
+/* Group by date */
+function groupByDate(thoughts: Thought[]) {
   const groups: Record<string, Thought[]> = {}
   for (const t of thoughts) {
-    const label = DATE_FMT(t.createdAt)
+    const label = dateFmt(t.createdAt)
     if (!groups[label]) groups[label] = []
     groups[label].push(t)
   }
   return Object.entries(groups).map(([label, items]) => ({ label, items }))
 }
 
-export default function ThreadView({ thoughts, onPin, onDelete }: Props) {
-  const sorted = [...thoughts].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+export default function ThreadView({ thoughts, onPin, onDelete, onMove }: Props) {
+  const sorted = useMemo(() => [...thoughts].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), [thoughts])
   const groups = groupByDate(sorted)
 
   if (!sorted.length) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--zinc-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Pencil size={18} style={{ color: 'var(--zinc-400)' }} />
-        </div>
-        <p style={{ fontSize: 14, color: 'var(--zinc-400)', margin: 0 }}>No thoughts yet</p>
-        <p style={{ fontSize: 12, color: 'var(--zinc-300)', margin: 0 }}>Tap Add below to start</p>
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 10,
+      }}>
+        <span style={{ fontSize: 32 }}>💭</span>
+        <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>No thoughts yet</p>
       </div>
     )
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0 100px' }} className="no-scroll">
-      {/* Centered thread column */}
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 32px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 40px 0' }} className="no-scroll">
+      <div style={{ maxWidth: 640, margin: '0 auto', paddingBottom: 120 }}>
         {groups.map(group => (
-          <div key={group.label}>
-            {/* Date divider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 4px' }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--zinc-100)' }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--zinc-400)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+          <div key={group.label} style={{ marginBottom: 8 }}>
+            {/* Date header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0 4px' }}>
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: '#94a3b8',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
                 {group.label}
               </span>
-              <div style={{ flex: 1, height: 1, background: 'var(--zinc-100)' }} />
+              <div style={{ flex: 1, height: 1, background: '#f1f5f9' }} />
             </div>
+
             {group.items.map(t => (
-              <ThreadItem key={t.id} thought={t} onPin={onPin} onDelete={onDelete} />
+              <ThoughtRow key={t.id} thought={t} onPin={onPin} onDelete={onDelete} onMove={onMove} />
             ))}
           </div>
         ))}

@@ -36,13 +36,13 @@ function VoicePlayer({ url, duration }: { url?: string; duration?: string }) {
     else audioRef.current.play().then(() => setPlaying(true)).catch(() => {})
   }
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 p-2.5 rounded-2xl border bg-[var(--surface-3)]" style={{ borderColor: 'var(--border-light)', marginTop: 4 }}>
       {url && <audio ref={audioRef} src={url} onEnded={() => setPlaying(false)} preload="metadata" />}
-      <button onClick={toggle} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all" style={{ background: playing ? 'var(--ink)' : 'var(--surface-2)', color: playing ? 'white' : 'var(--ink-2)' }}>
-        {playing ? <Pause size={11} /> : <Play size={11} />}
+      <button onClick={toggle} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all shadow-sm" style={{ background: playing ? 'var(--ink)' : 'white', border: playing ? 'none' : '1px solid var(--border-default)', color: playing ? 'white' : 'var(--ink)' }}>
+        {playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-[2px]" />}
       </button>
-      <div className="min-w-0 flex-1"><WaveformStatic /></div>
-      <span className="shrink-0 font-mono text-[10px] tabular-nums" style={{ color: 'var(--ink-4)' }}>{duration ?? '--'}</span>
+      <div className="min-w-0 flex-1 flex items-center"><WaveformStatic /></div>
+      <span className="shrink-0 font-medium text-[12px] tabular-nums" style={{ color: 'var(--ink-3)', fontFamily: 'Inter, sans-serif' }}>{duration ?? '--'}</span>
     </div>
   )
 }

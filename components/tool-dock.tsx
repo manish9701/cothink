@@ -7,7 +7,7 @@ import {
   type ElementType,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, blobToBase64 } from '@/lib/utils'
 import {
   Pencil, Mic, MicOff, Camera, Video, VideoOff,
   Sparkles, X, ArrowUp, RotateCcw, Check,
@@ -389,7 +389,9 @@ function VideoRecorder({
     mr.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data) }
     mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-      setUrl(URL.createObjectURL(blob))
+      blobToBase64(blob).then(b64 => {
+        setUrl(b64)
+      })
       setState('done')
       streamRef.current?.getTracks().forEach(t => t.stop())
     }
@@ -981,8 +983,9 @@ export default function ToolDock({ onAdd, recentThoughts }: ToolDockProps) {
             {/* ── Voice ── */}
             {active === 'voice' && (
               <VoiceRecorder
-                onSave={(blob, duration) => {
-                  onAdd({ type: 'voice', content: 'Voice memo', voiceUrl: URL.createObjectURL(blob), voiceDuration: duration })
+                onSave={async (blob, duration) => {
+                  const url = await blobToBase64(blob)
+                  onAdd({ type: 'voice', content: 'Voice memo', voiceUrl: url, voiceDuration: duration })
                   close()
                 }}
                 onCancel={close}

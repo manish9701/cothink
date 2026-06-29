@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { thoughts as thoughtsTable, folders as foldersTable, canvases as canvasesTable } from '@/lib/schema'
 import { eq, desc } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import type { SerializedThought } from '@/lib/thought-types'
 
 const USER_ID = process.env.MINDED_USER_ID || 'demo'
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
 
     // Use transaction to synchronize state safely
     await db.transaction(async (tx) => {
-      // Clear current state for this user to completely replace it
+      // Delete in correct order (thoughts first due to FK deps)
       await tx.delete(thoughtsTable).where(eq(thoughtsTable.userId, USER_ID))
       await tx.delete(foldersTable).where(eq(foldersTable.userId, USER_ID))
       await tx.delete(canvasesTable).where(eq(canvasesTable.userId, USER_ID))
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
             name: f.name,
             createdAt: new Date(f.createdAt)
           }))
-        )
+        ).onConflictDoNothing()
       }
 
       // Insert Canvases
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
             name: c.name,
             createdAt: new Date(c.createdAt)
           }))
-        )
+        ).onConflictDoNothing()
       }
 
       // Insert Thoughts
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
             rotation: t.rotation !== undefined ? t.rotation : null,
             scale: t.scale !== undefined ? t.scale : null,
           }))
-        )
+        ).onConflictDoNothing()
       }
     })
 

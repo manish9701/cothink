@@ -12,7 +12,9 @@ export interface Thought {
   voiceDuration?: string
   voiceTranscription?: string
   mediaUrl?: string
+  mediaUrls?: string[]
   canvasId?: string
+  folderId?: string
   x?: number
   y?: number
   rotation?: number
